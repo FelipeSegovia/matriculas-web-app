@@ -1,26 +1,102 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Tokens de la marca B4, los mismos de la landing (brief-matricula/src/styles/global.css). */
+@theme {
+  --color-ground: #f4f1fb;
+  --color-ink: #1f1a3d;
+  --color-ink-2: #3d3760;
+  --color-muted: #5a5478;
+  --color-line: #d9d3ee;
+  --color-field: #fbfaff;
+  --color-sun: #ffc94a;
+  --color-mint: #9ee3c8;
+  --color-on-ink: #d9d3ee;
+  --color-danger: #b42318;
+
+  --font-display: var(--font-fredoka), ui-rounded, sans-serif;
+  --font-body: var(--font-nunito), ui-rounded, system-ui, sans-serif;
+
+  --radius-card: 28px;
+  --radius-block: 36px;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Color del establecimiento: el panel fija --c con el color que entrega la API. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-school: var(--c);
+  --color-school-soft: var(--c-soft);
+  --color-school-deep: var(--c-deep);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  --c: #5b3fd6;
+  --c-soft: color-mix(in oklab, var(--c) 12%, white);
+  --c-deep: color-mix(in oklab, var(--c) 72%, #1f1a3d);
+  --shadow-float: 0 18px 40px -16px rgb(31 26 61 / 0.35), 0 4px 10px -4px rgb(31 26 61 / 0.18);
+  --shadow-soft: 0 10px 28px -18px rgb(31 26 61 / 0.4);
+  color-scheme: light;
+}
+
+@layer base {
+  body {
+    margin: 0;
+    background: var(--color-ground);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: 1rem;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+
+  ::selection {
+    background: var(--color-sun);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--focus, var(--c));
+    outline-offset: 3px;
+    border-radius: 10px;
+  }
+
+  table {
+    font-variant-numeric: tabular-nums;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Burbuja de habla: tres esquinas redondas y una aguda, como en la landing. */
+@utility bubble-bl {
+  border-radius: 22px 22px 22px 6px;
+}
+@utility bubble-br {
+  border-radius: 22px 22px 6px 22px;
+}
+
+@utility wrap {
+  width: 100%;
+  max-width: 1280px;
+  margin-inline: auto;
+  padding-inline: 16px;
+  @media (width >= 48rem) {
+    padding-inline: 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

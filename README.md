@@ -20,6 +20,18 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Panel de administración con datos mock (MSW)
+
+En desarrollo (`pnpm dev`), MSW simula la API y el panel queda en [http://localhost:3000/admin](http://localhost:3000/admin). Usuarios de prueba (ficticios, definidos en `mocks/data/index.ts`):
+
+| Rol | Correo | Contraseña |
+|-----|--------|------------|
+| Dirección | `direccion@ejemplo.cl` | `demo1234` |
+| UTP | `utp@ejemplo.cl` | `demo1234` |
+| Secretaría | `secretaria@ejemplo.cl` | `demo1234` |
+
+Los cambios se guardan en `sessionStorage` (clave `mock-matriculas`); bórrela para volver a los datos de ejemplo. Estas credenciales solo funcionan contra MSW, no contra el backend real.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
