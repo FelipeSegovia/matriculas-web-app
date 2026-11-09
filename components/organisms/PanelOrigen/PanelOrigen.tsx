@@ -52,6 +52,11 @@ export function PanelOrigen({ matricula, fuentes, rol }: Props) {
           </p>
         )}
       </div>
+      {matricula.ficha["origen.comoSupo"] && (
+        <p className="mt-3 text-sm text-ink-2">
+          Llegó sin código. El apoderado declaró: <span className="font-bold">«{matricula.ficha["origen.comoSupo"]}»</span>
+        </p>
+      )}
       <p className="mt-3 text-sm text-muted">El origen se fijó al recibir la pre-inscripción. La comisión se reconoce solo cuando la matrícula llega a «Matriculada».</p>
 
       {matricula.historialOrigen.length > 0 && (

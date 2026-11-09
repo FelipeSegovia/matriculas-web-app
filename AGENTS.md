@@ -58,8 +58,16 @@ Reglas:
 
 ## Panel de administración
 
-- Vive en `app/admin/`. `app/admin/providers.tsx` monta TanStack Query, MSW y el guard de sesión, y el panel se dibuja solo en el navegador; por eso sus segmentos declaran `export const instant = false`.
+- Vive en `app/admin/`. `app/admin/providers.tsx` agrega el color de la escuela y el guard de sesión sobre `app/providers.tsx`.
+- `app/providers.tsx` (TanStack Query + MSW) lo usan el panel y el formulario. Dibuja los hijos solo en el navegador, así que cada segmento que no se dibuja en el servidor declara `export const instant = false`.
 - Las reglas vienen de las notas de Obsidian: ciclo de vida (D03), origen y comisiones (D04), roles (D05), N° de matrícula (D06) y campos de la ficha (D09, D10).
+
+## Formulario de inscripción
+
+- Rutas públicas, sin sesión: `app/[escuela]/inscripcion` (paso 1, con `?ref=CODIGO` del QR) y `app/[escuela]/ficha/[token]` (enlace para retomar, pasos 2 a 9).
+- Los pasos y campos son los de D09 (`lib/ficha.ts`, los mismos que ve el panel). `lib/fichaPublica.ts` define cómo se le presentan al apoderado: etiquetas, ayudas y orden. Los campos con `soloEscuela` no aparecen en el formulario.
+- Reglas: solo el paso 1 es obligatorio y crea la pre-inscripción. Un RUT de alumno repetido no crea otra ficha y conserva el primer origen (D04). Sin código, el origen queda como orgánico y se pregunta "¿Cómo supo de nosotros?". El enlace vence a los 30 días o al pasar a «Evaluación agendada» (D09). Los datos de salud se guardan solo con su consentimiento separado (D12). «Enviar ficha» la pasa a «Ficha completa».
+- El aviso de privacidad es un borrador de D12, pendiente de revisión legal.
 
 ## Estado global: Zustand
 
@@ -72,9 +80,9 @@ Reglas:
 
 - Los datos mock se sirven con `msw` (dependencia de desarrollo). `public/mockServiceWorker.js` lo genera `msw init` (`msw.workerDirectory` en `package.json`): no editarlo a mano.
 - Los handlers y los datos de ejemplo van en `mocks/` (raíz): `mocks/handlers.ts` y `mocks/data/`. Los datos de ejemplo son ficticios: nunca usar el nombre del colegio piloto ni datos reales de apoderados o alumnos.
-- El código de la app llama a endpoints reales (`fetch('/api/...')`); MSW los intercepta en desarrollo. Ningún componente importa desde `mocks/`: el único punto de entrada es `app/admin/providers.tsx`, que arranca el worker.
+- El código de la app llama a endpoints reales (`fetch('/api/...')`); MSW los intercepta en desarrollo. Ningún componente importa desde `mocks/`: el único punto de entrada es `app/providers.tsx`, que arranca el worker.
 - `msw/browser` no existe en Node, así que `next.config.ts` (`turbopack.resolveAlias`) cambia `@/mocks/browser` por `mocks/sin-worker.ts` en el servidor.
-- Los handlers imitan las reglas del backend (permisos por rol, transiciones válidas, N° correlativo) y guardan su estado en `sessionStorage` (clave `mock-matriculas`). Para volver a los datos de ejemplo, borre esa clave.
+- Los handlers imitan las reglas del backend (permisos por rol, transiciones válidas, N° correlativo) y guardan su estado en `localStorage` (clave `mock-matriculas`), que comparten el panel y el formulario abiertos en pestañas distintas. Para volver a los datos de ejemplo, borre esa clave.
 
 ## Datos del servidor: TanStack Query
 

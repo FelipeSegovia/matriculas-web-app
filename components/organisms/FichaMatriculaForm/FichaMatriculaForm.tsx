@@ -7,10 +7,9 @@ import { Select } from "@/components/atoms/Select";
 import { Textarea } from "@/components/atoms/Textarea";
 import { FormField } from "@/components/molecules/FormField";
 import { useActualizarMatricula } from "@/hooks/useEditarMatricula";
-import { CAMPOS, SECCIONES, type Campo } from "@/lib/ficha";
+import { CAMPOS, SECCIONES, limpiarFicha, validarCampos, type Campo } from "@/lib/ficha";
 import { edadActual, edadAMarzo, type Matricula, type PersonaAutorizada, type Rol } from "@/lib/matricula";
 import { puede } from "@/lib/permisos";
-import { formatearRut, validarRut } from "@/lib/rut";
 import type { Establecimiento } from "@/services/establecimiento";
 
 const TIPO_INPUT: Partial<Record<Campo["tipo"], string>> = {
@@ -21,17 +20,6 @@ const TIPO_INPUT: Partial<Record<Campo["tipo"], string>> = {
 };
 
 const PERSONA_VACIA: PersonaAutorizada = { parentesco: "", nombre: "", edad: "", telefono: "" };
-
-function validar(ficha: Record<string, string>) {
-  const errores: Record<string, string> = {};
-  for (const c of CAMPOS) {
-    const v = ficha[c.clave]?.trim() ?? "";
-    if (c.obligatorio && !v) errores[c.clave] = "Este dato es obligatorio.";
-    else if (v && c.tipo === "rut" && !validarRut(v)) errores[c.clave] = "El RUT no es válido. Revise el dígito verificador.";
-    else if (v && c.tipo === "correo" && !/^\S+@\S+\.\S+$/.test(v)) errores[c.clave] = "El correo no es válido.";
-  }
-  return errores;
-}
 
 type Props = { matricula: Matricula; establecimiento: Establecimiento; rol: Rol };
 
@@ -67,18 +55,15 @@ export function FichaMatriculaForm({ matricula, establecimiento, rol }: Props) {
 
   function enviar(e: FormEvent) {
     e.preventDefault();
-    const encontrados = validar(ficha);
+    const encontrados = validarCampos(CAMPOS, ficha);
     setErrores(encontrados);
     const primero = Object.keys(encontrados)[0];
     if (primero) {
       document.getElementById(primero)?.focus();
       return;
     }
-    const limpia = Object.fromEntries(
-      Object.entries(ficha).map(([k, v]) => [k, CAMPOS.find((c) => c.clave === k)?.tipo === "rut" ? formatearRut(v) : v.trim()]),
-    );
     guardar.mutate(
-      { ficha: limpia, personasAutorizadas: personas.filter((p) => p.nombre.trim()) },
+      { ficha: limpiarFicha(ficha), personasAutorizadas: personas.filter((p) => p.nombre.trim()) },
       {
         onSuccess: (m) => {
           setFicha(m.ficha);

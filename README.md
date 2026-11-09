@@ -30,7 +30,12 @@ En desarrollo (`pnpm dev`), MSW simula la API y el panel queda en [http://localh
 | UTP | `utp@ejemplo.cl` | `demo1234` |
 | Secretaría | `secretaria@ejemplo.cl` | `demo1234` |
 
-Los cambios se guardan en `sessionStorage` (clave `mock-matriculas`); bórrela para volver a los datos de ejemplo. Estas credenciales solo funcionan contra MSW, no contra el backend real.
+Formulario de inscripción del apoderado (sin login), para la escuela de ejemplo:
+
+- Inscripción nueva con el QR de una promotora: [http://localhost:3000/ejemplo/inscripcion?ref=PROM-CR](http://localhost:3000/ejemplo/inscripcion?ref=PROM-CR). Otros códigos: `PROM-DM`, `EDU-PH` y `FLY-V27`. Sin `ref`, se pregunta "¿Cómo supo de nosotros?".
+- Retomar una ficha existente: `http://localhost:3000/ejemplo/ficha/demo-m001`. Funcionan de `demo-m001` a `demo-m010`, que están en «Pre-inscrita» o «Ficha completa». Desde `demo-m011` en adelante, el enlace aparece desactivado.
+
+Los cambios se guardan en `localStorage` (clave `mock-matriculas`), compartido entre el panel y el formulario; bórrela para volver a los datos de ejemplo. Estas credenciales y enlaces solo funcionan contra MSW, no contra el backend real.
 
 ## Learn More
 

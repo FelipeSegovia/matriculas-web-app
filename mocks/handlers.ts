@@ -1,26 +1,28 @@
-// API simulada del panel. Imita las reglas que aplicará el backend real (D03–D06) para que la UI choque con ellas.
+// API simulada. Imita las reglas que aplicará el backend real (D03–D06, D09, D12) para que la UI choque con ellas.
 import { http, HttpResponse } from "msw";
 import { ESTADOS, resumir, type Estado, type Matricula, type Usuario } from "@/lib/matricula";
 import { puede, transicionesPermitidas } from "@/lib/permisos";
-import { CLAVES_CONTACTO } from "@/lib/ficha";
+import { CAMPOS, CLAVES_CONTACTO, limpiarFicha, validarCampos } from "@/lib/ficha";
+import { CLAVES_SALUD, PASOS } from "@/lib/fichaPublica";
+import { formatearRut } from "@/lib/rut";
 import { CLAVE_DEMO, establecimiento, fuentes, semilla, usuarios } from "./data";
 
 const CLAVE_DB = "mock-matriculas";
+const DIAS_TOKEN = 30;
 
-// Guardado en sessionStorage para que los cambios sobrevivan a una recarga de la pestaña.
-function cargar(): Matricula[] {
+// Guardado en localStorage: sobrevive a recargas y lo comparten el formulario y el panel abiertos en otras pestañas.
+// Se relee en cada petición para ver lo que escribió la otra pestaña.
+function leer(): Matricula[] {
   try {
-    const guardado = sessionStorage.getItem(CLAVE_DB);
+    const guardado = localStorage.getItem(CLAVE_DB);
     if (guardado) return JSON.parse(guardado);
   } catch {}
   return semilla();
 }
 
-const db = cargar();
-
-function guardar() {
+function guardar(db: Matricula[]) {
   try {
-    sessionStorage.setItem(CLAVE_DB, JSON.stringify(db));
+    localStorage.setItem(CLAVE_DB, JSON.stringify(db));
   } catch {}
 }
 
@@ -31,13 +33,31 @@ function usuarioDe(request: Request): Usuario | undefined {
 
 const error = (status: number, mensaje: string) => HttpResponse.json({ mensaje }, { status });
 
-function siguienteNumero() {
+function siguienteNumero(db: Matricula[]) {
   const prefijo = `${establecimiento.anioEscolar}-`;
   const usados = db.filter((m) => m.numero?.startsWith(prefijo)).map((m) => Number(m.numero!.slice(prefijo.length)));
   return `${prefijo}${String(Math.max(0, ...usados) + 1).padStart(3, "0")}`;
 }
 
-export const handlers = [
+/** Lo que ve el apoderado de su ficha: sin origen, N° ni historial. */
+function fichaPublica(m: Matricula) {
+  return {
+    ficha: m.ficha,
+    personasAutorizadas: m.personasAutorizadas,
+    consentimientoSalud: !!m.consentimientoSalud,
+    enviada: m.estado !== "PreInscrita",
+  };
+}
+
+function porToken(db: Matricula[], token: string) {
+  const m = db.find((x) => x.token === token);
+  if (!m) return { error: error(404, "No encontramos esta ficha. Revise que el enlace esté completo.") };
+  if (!m.tokenActivo || (m.tokenVenceEn && new Date(m.tokenVenceEn) < new Date()))
+    return { error: error(410, "Este enlace ya no está activo. La escuela está revisando su ficha y le contactará.") };
+  return { m };
+}
+
+const handlersPanel = [
   http.post("/api/auth/login", async ({ request }) => {
     const { correo, clave } = (await request.json()) as { correo: string; clave: string };
     const usuario = usuarios.find((u) => u.correo === correo.trim().toLowerCase());
@@ -51,6 +71,7 @@ export const handlers = [
 
   http.get("/api/matriculas", ({ request }) => {
     if (!usuarioDe(request)) return error(401, "Sesión expirada.");
+    const db = leer();
     const q = new URL(request.url).searchParams;
     const fuente = q.get("fuente");
     const estado = q.get("estado");
@@ -70,11 +91,12 @@ export const handlers = [
 
   http.get("/api/matriculas/:id", ({ request, params }) => {
     if (!usuarioDe(request)) return error(401, "Sesión expirada.");
+    const db = leer();
     const m = db.find((x) => x.id === params.id);
     if (!m) return error(404, "No existe esa matrícula.");
     if (!m.vista) {
       m.vista = true;
-      guardar();
+      guardar(db);
     }
     return HttpResponse.json(m);
   }),
@@ -82,6 +104,7 @@ export const handlers = [
   http.patch("/api/matriculas/:id", async ({ request, params }) => {
     const usuario = usuarioDe(request);
     if (!usuario) return error(401, "Sesión expirada.");
+    const db = leer();
     const m = db.find((x) => x.id === params.id);
     if (!m) return error(404, "No existe esa matrícula.");
     const cambios = (await request.json()) as Pick<Matricula, "ficha" | "personasAutorizadas">;
@@ -93,13 +116,14 @@ export const handlers = [
     } else {
       return error(403, "Su rol no puede editar la ficha.");
     }
-    guardar();
+    guardar(db);
     return HttpResponse.json(m);
   }),
 
   http.post("/api/matriculas/:id/estado", async ({ request, params }) => {
     const usuario = usuarioDe(request);
     if (!usuario) return error(401, "Sesión expirada.");
+    const db = leer();
     const m = db.find((x) => x.id === params.id);
     if (!m) return error(404, "No existe esa matrícula.");
     const { estado } = (await request.json()) as { estado: Estado };
@@ -107,9 +131,9 @@ export const handlers = [
       return error(409, "Ese cambio de estado no está permitido.");
     }
     m.estado = estado;
-    if (estado === "ListaParaFirmar" && !m.numero) m.numero = siguienteNumero();
+    if (estado === "ListaParaFirmar" && !m.numero) m.numero = siguienteNumero(db);
     if (estado === "EvaluacionAgendada") m.tokenActivo = false;
-    guardar();
+    guardar(db);
     return HttpResponse.json(m);
   }),
 
@@ -117,6 +141,7 @@ export const handlers = [
     const usuario = usuarioDe(request);
     if (!usuario) return error(401, "Sesión expirada.");
     if (!puede(usuario.rol, "cambiarOrigen")) return error(403, "Solo Dirección puede cambiar el origen.");
+    const db = leer();
     const m = db.find((x) => x.id === params.id);
     if (!m) return error(404, "No existe esa matrícula.");
     const { fuenteId, motivo } = (await request.json()) as { fuenteId: string; motivo: string };
@@ -132,7 +157,86 @@ export const handlers = [
       motivo: motivo.trim(),
     });
     m.fuenteId = nueva.id;
-    guardar();
+    guardar(db);
     return HttpResponse.json(m);
   }),
 ];
+
+// Formulario del apoderado: sin sesión. Se identifica por la escuela (slug) y, después del paso 1, por el token.
+const handlersPublicos = [
+  http.get("/api/publico/escuelas/:slug", ({ params }) => {
+    if (params.slug !== establecimiento.slug) return error(404, "No encontramos esta escuela.");
+    const { nombre, direccion, color, anioEscolar, niveles, jornadas, slug } = establecimiento;
+    return HttpResponse.json({ slug, nombre, direccion, color, anioEscolar, niveles, jornadas });
+  }),
+
+  http.post("/api/publico/escuelas/:slug/inscripciones", async ({ request, params }) => {
+    if (params.slug !== establecimiento.slug) return error(404, "No encontramos esta escuela.");
+    const datos = (await request.json()) as { ficha: Record<string, string>; ref?: string; comoSupo?: string; aceptaPrivacidad: boolean };
+    if (!datos.aceptaPrivacidad) return error(400, "Debe aceptar el aviso de privacidad para inscribir.");
+    if (Object.keys(validarCampos(PASOS[0].campos, datos.ficha)).length) return error(400, "Revise los datos del paso 1.");
+
+    const db = leer();
+    const ficha = limpiarFicha(datos.ficha);
+    // El primer origen manda (D04): si el RUT ya existe, no se crea otra ficha ni cambia el origen.
+    if (db.some((m) => formatearRut(m.ficha["alumno.rut"] ?? "") === ficha["alumno.rut"])) {
+      return error(409, "Este alumno(a) ya tiene una inscripción en la escuela. La escuela le contactará; si necesita cambiar algo, use el enlace que recibió al inscribirlo.");
+    }
+    // Un código desconocido cuenta como orgánico: sin código válido no hay comisión.
+    const fuente = fuentes.find((f) => f.codigo === datos.ref?.toUpperCase()) ?? fuentes.find((f) => f.tipo === "Organico")!;
+    if (datos.comoSupo && fuente.tipo === "Organico") ficha["origen.comoSupo"] = datos.comoSupo;
+
+    const ahora = new Date();
+    const token = crypto.randomUUID();
+    db.push({
+      id: `m${String(db.length + 1).padStart(3, "0")}`,
+      estado: "PreInscrita",
+      fuenteId: fuente.id,
+      creadaEn: ahora.toISOString(),
+      numero: null,
+      vista: false,
+      tokenActivo: true,
+      token,
+      tokenVenceEn: new Date(ahora.getTime() + DIAS_TOKEN * 86_400_000).toISOString(),
+      consentimientoSalud: false,
+      ficha,
+      personasAutorizadas: [],
+      historialOrigen: [],
+    });
+    guardar(db);
+    return HttpResponse.json({ token }, { status: 201 });
+  }),
+
+  http.get("/api/publico/fichas/:token", ({ params }) => {
+    const { m, error: e } = porToken(leer(), String(params.token));
+    return e ?? HttpResponse.json(fichaPublica(m));
+  }),
+
+  http.patch("/api/publico/fichas/:token", async ({ request, params }) => {
+    const db = leer();
+    const { m, error: e } = porToken(db, String(params.token));
+    if (e) return e;
+    const datos = (await request.json()) as {
+      ficha: Record<string, string>;
+      personasAutorizadas: Matricula["personasAutorizadas"];
+      consentimientoSalud: boolean;
+      enviar?: boolean;
+    };
+    const ficha = limpiarFicha(datos.ficha);
+    if (Object.keys(validarCampos(CAMPOS.filter((c) => !c.soloEscuela), ficha)).length) return error(400, "Revise los datos marcados.");
+    // El RUT del alumno no cambia (es la llave de duplicados) y los campos de la escuela no los toca el apoderado.
+    for (const c of CAMPOS) {
+      if (c.soloEscuela || c.clave === "alumno.rut") continue;
+      m.ficha[c.clave] = ficha[c.clave] ?? "";
+    }
+    // Sin consentimiento de salud (D12) no se guarda ningún dato médico.
+    m.consentimientoSalud = datos.consentimientoSalud;
+    if (!m.consentimientoSalud) for (const clave of CLAVES_SALUD) m.ficha[clave] = "";
+    m.personasAutorizadas = datos.personasAutorizadas.filter((p) => p.nombre.trim());
+    if (datos.enviar && m.estado === "PreInscrita") m.estado = "FichaCompleta";
+    guardar(db);
+    return HttpResponse.json(fichaPublica(m));
+  }),
+];
+
+export const handlers = [...handlersPanel, ...handlersPublicos];

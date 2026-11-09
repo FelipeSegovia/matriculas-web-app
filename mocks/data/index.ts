@@ -3,10 +3,12 @@ import type { Estado, Fuente, Matricula, Usuario } from "@/lib/matricula";
 import { digitoVerificador, formatearRut } from "@/lib/rut";
 
 export const establecimiento = {
+  slug: "ejemplo",
   nombre: "Escuela de Lenguaje Ejemplo",
+  direccion: "Av. Ejemplo 123, Comuna Ejemplo",
   color: "#5b3fd6",
   anioEscolar: 2027,
-  niveles: ["Medio Mayor", "NT1", "NT2"],
+  niveles: ["Medio Mayor", "Prekínder", "Kínder"],
   jornadas: ["Mañana", "Tarde"],
 };
 
@@ -104,6 +106,10 @@ function crear(i: number, estado: Estado, numero: string | null): Matricula {
     // Las más recientes aún no se han abierto.
     vista: !(estado === "PreInscrita" && i < 4),
     tokenActivo: ["PreInscrita", "FichaCompleta"].includes(estado),
+    // Enlace para retomar de ejemplo: /ejemplo/ficha/demo-m001, etc.
+    token: `demo-m${String(i + 1).padStart(3, "0")}`,
+    tokenVenceEn: new Date(creada.getTime() + 30 * 86_400_000).toISOString(),
+    consentimientoSalud: AVANZADOS.includes(estado),
     ficha,
     personasAutorizadas: AVANZADOS.includes(estado)
       ? [{ parentesco: "Abuela", nombre: `Rosa ${apellido2}`, edad: "62", telefono: "+56 9 6123 4567" }]

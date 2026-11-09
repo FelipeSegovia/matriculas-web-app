@@ -1,5 +1,6 @@
 // Ficha de matrícula modernizada en 9 secciones (D09 + D10). El formulario del panel se arma desde estos datos.
 // Las opciones salen de la ficha en papel; RSH, Seguridades y Oportunidades reemplazan a CAS/FPS/Chile Solidario.
+import { formatearRut, validarRut } from "./rut.ts";
 
 export type TipoCampo = "texto" | "area" | "fecha" | "rut" | "telefono" | "correo" | "numero" | "seleccion";
 
@@ -12,6 +13,8 @@ export type Campo = {
   obligatorio?: boolean;
   /** Dato de contacto: Secretaría puede editarlo (D05). */
   contacto?: boolean;
+  /** Lo completa la escuela; no aparece en el formulario del apoderado. */
+  soloEscuela?: boolean;
   ancho?: "completo";
 };
 
@@ -132,11 +135,11 @@ export const SECCIONES: Seccion[] = [
     titulo: "9. Requerimientos",
     campos: [
       { clave: "req.junaeb", etiqueta: "Alimentación JUNAEB", tipo: "seleccion", opciones: SI_NO },
-      { clave: "req.junaebPrioridad", etiqueta: "Prioridad JUNAEB", tipo: "seleccion", opciones: PRIORIDAD },
+      { clave: "req.junaebPrioridad", etiqueta: "Prioridad JUNAEB", tipo: "seleccion", opciones: PRIORIDAD, soloEscuela: true },
       { clave: "req.furgon", etiqueta: "Furgón escolar", tipo: "seleccion", opciones: SI_NO },
-      { clave: "req.furgonPrioridad", etiqueta: "Prioridad furgón", tipo: "seleccion", opciones: PRIORIDAD },
+      { clave: "req.furgonPrioridad", etiqueta: "Prioridad furgón", tipo: "seleccion", opciones: PRIORIDAD, soloEscuela: true },
       { clave: "req.extension", etiqueta: "Extensión horaria", tipo: "seleccion", opciones: SI_NO },
-      { clave: "req.extensionPrioridad", etiqueta: "Prioridad extensión", tipo: "seleccion", opciones: PRIORIDAD },
+      { clave: "req.extensionPrioridad", etiqueta: "Prioridad extensión", tipo: "seleccion", opciones: PRIORIDAD, soloEscuela: true },
       { clave: "req.observaciones", etiqueta: "Observaciones", tipo: "area", ancho: "completo" },
     ],
   },
@@ -145,3 +148,24 @@ export const SECCIONES: Seccion[] = [
 export const CAMPOS = SECCIONES.flatMap((s) => s.campos);
 
 export const CLAVES_CONTACTO = CAMPOS.filter((c) => c.contacto).map((c) => c.clave);
+
+/** Errores por clave: obligatorios vacíos, RUT con mal dígito verificador, correo o teléfono mal escritos. */
+export function validarCampos(campos: Campo[], ficha: Record<string, string>) {
+  const errores: Record<string, string> = {};
+  for (const c of campos) {
+    const v = ficha[c.clave]?.trim() ?? "";
+    if (c.obligatorio && !v) errores[c.clave] = "Este dato es obligatorio.";
+    else if (v && c.tipo === "rut" && !validarRut(v)) errores[c.clave] = "El RUT no es válido. Revise el dígito verificador.";
+    else if (v && c.tipo === "correo" && !/^\S+@\S+\.\S+$/.test(v)) errores[c.clave] = "El correo no es válido.";
+    else if (v && c.tipo === "telefono" && v.replace(/\D/g, "").length < 8) errores[c.clave] = "Revise el número: faltan dígitos.";
+  }
+  return errores;
+}
+
+/** Quita espacios sobrantes y deja los RUT con puntos y guion. */
+export function limpiarFicha(ficha: Record<string, string>) {
+  const tipos = new Map(CAMPOS.map((c) => [c.clave, c.tipo]));
+  return Object.fromEntries(
+    Object.entries(ficha).map(([k, v]) => [k, tipos.get(k) === "rut" ? formatearRut(v.trim()) : v.trim()]),
+  );
+}

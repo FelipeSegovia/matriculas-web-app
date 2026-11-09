@@ -38,3 +38,21 @@ test("permisos por rol (D05)", () => {
   assert.deepEqual(transicionesPermitidas("Secretaria", "ListaParaFirmar"), ["Matriculada"]);
   assert.deepEqual(transicionesPermitidas("UTP", "Evaluada"), ["ListaParaFirmar", "EnListaDeEspera", "Descartada"]);
 });
+
+test("validación de la ficha y formulario público", async () => {
+  const { CAMPOS, validarCampos, limpiarFicha } = await import("./ficha.ts");
+  const { PASOS, CLAVES_SALUD, numeroWhatsapp } = await import("./fichaPublica.ts");
+  const errores = validarCampos(CAMPOS, { "alumno.rut": "12.345.678-9", "apoderado.correo": "sin-arroba", "apoderado.telefono": "123" });
+  assert.equal(errores["alumno.rut"], "El RUT no es válido. Revise el dígito verificador.");
+  assert.ok(errores["alumno.nombre"]);
+  assert.ok(errores["apoderado.correo"]);
+  assert.ok(errores["apoderado.telefono"]);
+  assert.equal(limpiarFicha({ "alumno.rut": " 123456785 ", "alumno.nombre": " Ana " })["alumno.rut"], "12.345.678-5");
+  assert.equal(PASOS.length, 9);
+  assert.equal(PASOS[7].id, "autorizadas");
+  assert.ok(!PASOS.flatMap((p) => p.campos).some((c) => c.soloEscuela));
+  assert.ok(CLAVES_SALUD.includes("medico.alergias"));
+  assert.equal(numeroWhatsapp("+56 9 5117 1037"), "56951171037");
+  assert.equal(numeroWhatsapp("9 5117 1037"), "56951171037");
+  assert.equal(numeroWhatsapp("512 223344"), null);
+});

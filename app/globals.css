@@ -100,3 +100,9 @@
     animation-duration: 0.01ms !important;
   }
 }
+
+/* Recalcula los tonos derivados cuando un contenedor fija su propio --c (formulario de cada escuela). */
+.color-escuela {
+  --c-soft: color-mix(in oklab, var(--c) 12%, white);
+  --c-deep: color-mix(in oklab, var(--c) 72%, #1f1a3d);
+}

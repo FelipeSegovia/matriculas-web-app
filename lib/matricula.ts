@@ -82,6 +82,11 @@ export type Matricula = {
   numero: string | null;
   vista: boolean;
   tokenActivo: boolean;
+  /** Enlace para retomar del apoderado (D09): vence a los 30 días. */
+  token?: string;
+  tokenVenceEn?: string;
+  /** Consentimiento separado para guardar datos de salud (D12). */
+  consentimientoSalud?: boolean;
   ficha: Ficha;
   personasAutorizadas: PersonaAutorizada[];
   historialOrigen: CambioOrigen[];
